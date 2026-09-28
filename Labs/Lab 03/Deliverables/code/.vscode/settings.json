@@ -1,0 +1,10 @@
+{
+    "cmake.configureOnOpen": true,
+    "cmake.useCMakePresets": "always",
+    "cmake.debugConfig": {
+        "type": "lldb-dap",
+        "preLaunchTask": "CMake Build (macOS)",
+        "console": "integratedTerminal"
+    },
+    "C_Cpp.debugShortcut": false
+}

@@ -1,0 +1,63 @@
+#pragma once
+
+#include <functional>
+
+#include "node.hpp"
+
+class CircularLinkedList
+{
+public:
+    CircularLinkedList() : head(nullptr) {}
+    CircularLinkedList(int value) : head(new Node{value, nullptr})
+    {
+        head->next = head; // point after creation
+    }
+    ~CircularLinkedList() { removeAll(); }
+
+    // copy
+    CircularLinkedList(const CircularLinkedList &other);
+    CircularLinkedList &operator=(const CircularLinkedList &other);
+
+    // move
+    CircularLinkedList(CircularLinkedList &&old) noexcept;
+    CircularLinkedList &operator=(CircularLinkedList &&old) noexcept;
+
+    // Get
+
+    int *get(size_t index);
+    inline int *getFirst() { return get(0); }
+    inline int *getLast() { return get(count() - 1); }
+
+    // Insert
+
+    bool insertAt(int value, size_t index);
+    inline bool insertStart(int value) { return insertAt(value, 0); }
+    inline bool insertEnd(int value) { return insertAt(value, count()); }
+
+    // Remove
+
+    bool removeIf(const std::function<bool(const int &, size_t)> &predicate);
+
+    bool removeAt(int index);
+    inline bool removeFirst() { return removeAt(0); }
+    inline bool removeLast() { return removeAt(count() - 1); }
+
+    void removeAll();
+
+    // Count
+
+    size_t count() const;
+
+    // For Each
+
+    void forEach(std::function<void(NodeLink, size_t)> func);
+    void forEach(std::function<void(ConstNode, size_t)> func) const;
+
+private:
+    Node *head;
+
+    inline const bool indexInBounds(size_t i, bool includeLast = false) const
+    {
+        return i >= 0 && (includeLast ? i <= count() : i < count());
+    }
+};
