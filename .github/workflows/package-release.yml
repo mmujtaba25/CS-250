@@ -1,0 +1,54 @@
+name: Package directory release
+
+on:
+  workflow_dispatch:
+    inputs:
+      directory:
+        description: Repository directory to package (for example, Labs/Lab 03)
+        required: true
+        type: string
+      tag:
+        description: Release tag (for example, lab-03)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  package-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Package directory
+        id: package
+        env:
+          INPUT_DIRECTORY: ${{ inputs.directory }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$INPUT_DIRECTORY" = /* || "/$INPUT_DIRECTORY/" == *"/../"* || ! -d "$INPUT_DIRECTORY" ]]; then
+            echo "Directory must be an existing path inside the repository." >&2
+            exit 1
+          fi
+          if [[ -z "$INPUT_TAG" || "$INPUT_TAG" == *[!a-zA-Z0-9._-]* ]]; then
+            echo "Tag may contain only letters, numbers, dots, underscores, and hyphens." >&2
+            exit 1
+          fi
+
+          directory_name="$(basename "$INPUT_DIRECTORY")"
+          archive="${directory_name}-${INPUT_TAG}.zip"
+          parent_directory="$(dirname "$INPUT_DIRECTORY")"
+          (cd "$parent_directory" && zip -r "$GITHUB_WORKSPACE/$archive" "$directory_name")
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.tag }}
+          files: ${{ steps.package.outputs.archive }}
+          generate_release_notes: true
