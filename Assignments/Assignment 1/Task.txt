@@ -1,0 +1,5 @@
+CLO-1: Learn the basics of various data structures and algorithms, including their properties, use cases, and efficiency. They will be able to describe how these structures work and identify their applications.
+
+Summarize the Google Research Paper in a 2-3 page document using Latex. Please ensure that the summary is written in your own words and no sentence is directly copied and pasted from the paper. Briefly describe the functionality and rationale behind each data structure presented in Section 4.2 of the paper.
+
+Note: Please note that for this assignment, you are required to use LaTeX. Submissions in any other format, including Word, PDF, or handwritten work, will not be accepted.
