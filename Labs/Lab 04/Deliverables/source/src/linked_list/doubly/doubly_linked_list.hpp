@@ -2,22 +2,31 @@
 
 #include <functional>
 
-#include "node.hpp"
+struct DoubleSidedNode
+{
+    int data;
+    DoubleSidedNode *next;
+    DoubleSidedNode *previous;
+};
 
-class LinkedList
+using DoubleSidedNodeLink = DoubleSidedNode *&;
+using DoubleSidedConstNode = const DoubleSidedNode *;
+
+
+class DoublyLinkedList
 {
 public:
-    LinkedList() : head(nullptr), count_(0) {}
-    LinkedList(int value) : head(new Node{value, nullptr}), count_(1) {}
-    ~LinkedList() { removeAll(); }
+    DoublyLinkedList() : head(nullptr), count_(0) {}
+    DoublyLinkedList(int value) : head(new DoubleSidedNode{value, nullptr, nullptr}), count_(1) {}
+    ~DoublyLinkedList() { removeAll(); }
 
     // copy
-    LinkedList(const LinkedList &other);
-    LinkedList &operator=(const LinkedList &other);
+    DoublyLinkedList(const DoublyLinkedList &other);
+    DoublyLinkedList &operator=(const DoublyLinkedList &other);
 
     // move
-    LinkedList(LinkedList &&old) noexcept;
-    LinkedList &operator=(LinkedList &&old) noexcept;
+    DoublyLinkedList(DoublyLinkedList &&old) noexcept;
+    DoublyLinkedList &operator=(DoublyLinkedList &&old) noexcept;
 
     // Get
 
@@ -47,11 +56,11 @@ public:
 
     // For Each
 
-    void forEach(std::function<bool(NodeLink, size_t)> func);
-    void forEach(std::function<bool(ConstNode, size_t)> func) const;
+    void forEach(std::function<bool(DoubleSidedNodeLink, size_t)> func);
+    void forEach(std::function<bool(DoubleSidedConstNode, size_t)> func) const;
 
 private:
-    Node *head = nullptr;
+    DoubleSidedNode *head = nullptr;
     int count_ = 0;
 
     inline const bool indexInBounds(size_t i, bool includeLast = false) const

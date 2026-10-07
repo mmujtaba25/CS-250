@@ -1,18 +1,18 @@
-#include "linked_list.hpp"
+#include "doubly_linked_list.hpp"
 
 // MARK: Copy
 
-LinkedList::LinkedList(const LinkedList &other) : head(nullptr), count_(0)
+DoublyLinkedList::DoublyLinkedList(const DoublyLinkedList &other) : head(nullptr), count_(0)
 {
     // copy each node;
     // no need to cleanup, new object being created with head initialized to null
-    other.forEach([this](ConstNode node, size_t) { //
+    other.forEach([this](DoubleSidedConstNode node, size_t) { //
         this->insertEnd(node->data);
         return false;
     });
 }
 
-LinkedList &LinkedList::operator=(const LinkedList &other)
+DoublyLinkedList &DoublyLinkedList::operator=(const DoublyLinkedList &other)
 {
     // if same
     if (this == &other)
@@ -22,7 +22,7 @@ LinkedList &LinkedList::operator=(const LinkedList &other)
     this->removeAll();
 
     // insert elements into other
-    other.forEach([this](ConstNode node, size_t) { //
+    other.forEach([this](DoubleSidedConstNode node, size_t) { //
         this->insertEnd(node->data);
         return false;
     });
@@ -32,13 +32,13 @@ LinkedList &LinkedList::operator=(const LinkedList &other)
 
 // MARK: Move
 
-LinkedList::LinkedList(LinkedList &&old) noexcept : head(old.head), count_(old.count_) // repoint head
+DoublyLinkedList::DoublyLinkedList(DoublyLinkedList &&old) noexcept : head(old.head), count_(old.count_) // repoint head
 {
     old.head = nullptr; // remove reference from old onec
     old.count_ = 0;
 }
 
-LinkedList &LinkedList::operator=(LinkedList &&old) noexcept
+DoublyLinkedList &DoublyLinkedList::operator=(DoublyLinkedList &&old) noexcept
 {
     // if same
     if (this == &old)
@@ -60,14 +60,14 @@ LinkedList &LinkedList::operator=(LinkedList &&old) noexcept
 // MARK: Get
 
 /// `nullptr` = not found
-int *LinkedList::get(size_t index, size_t *nodes_examined)
+int *DoublyLinkedList::get(size_t index, size_t *nodes_examined)
 {
     if (index < 0 || !head)
         return nullptr;
 
     int *result = nullptr;
 
-    forEach([&result, &index, &nodes_examined](NodeLink current, size_t currentIndex) { //
+    forEach([&result, &index, &nodes_examined](DoubleSidedNodeLink current, size_t currentIndex) { //
         if (nodes_examined != nullptr)
             (*nodes_examined)++;
 
@@ -87,7 +87,7 @@ int *LinkedList::get(size_t index, size_t *nodes_examined)
 // MARK: Insert
 
 /// the value is inserted at index `index`, get using `get(index)`;
-bool LinkedList::insertAt(int value, size_t index)
+bool DoublyLinkedList::insertAt(int value, size_t index)
 {
     if (!indexInBounds(index, true))
         return false;
@@ -96,7 +96,7 @@ bool LinkedList::insertAt(int value, size_t index)
     // for each cannot run in a empty list
     if (head == nullptr)
     {
-        head = new Node{value, nullptr};
+        head = new DoubleSidedNode{value, nullptr};
         count_++;
         return true;
     }
@@ -106,10 +106,10 @@ bool LinkedList::insertAt(int value, size_t index)
     // inserting at the end
     if (index == count_)
     {
-        forEach([&value, &inserted, this](NodeLink current, size_t index) { //
+        forEach([&value, &inserted, this](DoubleSidedNodeLink current, size_t index) { //
             if (current->next == nullptr && !inserted)
             {
-                current->next = new Node{value, nullptr};
+                current->next = new DoubleSidedNode{value, nullptr};
 
                 inserted = true;
                 count_++;
@@ -123,11 +123,11 @@ bool LinkedList::insertAt(int value, size_t index)
     }
 
     // inserting in the middle
-    forEach([&value, &index, &inserted, this](NodeLink current, size_t currentIndex) { //
+    forEach([&value, &index, &inserted, this](DoubleSidedNodeLink current, size_t currentIndex) { //
         if (currentIndex == index && !inserted)
         {
             // create node and point to current node
-            Node *newNode = new Node{value, current};
+            DoubleSidedNode *newNode = new DoubleSidedNode{value, current};
             // point current to new node
             current = newNode;
 
@@ -144,7 +144,7 @@ bool LinkedList::insertAt(int value, size_t index)
 
 // MARK: Remove
 
-bool LinkedList::removeIf(const std::function<bool(const int &, size_t)> &predicate)
+bool DoublyLinkedList::removeIf(const std::function<bool(const int &, size_t)> &predicate)
 {
     // nothing to remove
     if (head == nullptr)
@@ -153,7 +153,7 @@ bool LinkedList::removeIf(const std::function<bool(const int &, size_t)> &predic
     // chekc if predicate applies to head
     if (predicate(head->data, 0))
     {
-        Node *old = head;
+        DoubleSidedNode *old = head;
         // move head by one
         head = head->next;
         // free up old space
@@ -166,13 +166,13 @@ bool LinkedList::removeIf(const std::function<bool(const int &, size_t)> &predic
 
     bool removed = false;
     // check predicate : all except head
-    forEach([&predicate, &removed, this](NodeLink current, size_t index) { //
+    forEach([&predicate, &removed, this](DoubleSidedNodeLink current, size_t index) { //
         // run only once && not empty or last
         if (removed || current == nullptr || current->next == nullptr)
             return false; // equivalent to continue in a for loop
 
         // check if predicate applies to the next node
-        Node *nextNode = current->next;
+        DoubleSidedNode *nextNode = current->next;
         if (predicate(nextNode->data, index + 1))
         {
             // point current's next to the next, next node
@@ -191,7 +191,7 @@ bool LinkedList::removeIf(const std::function<bool(const int &, size_t)> &predic
     return removed;
 }
 
-bool LinkedList::removeAt(int index)
+bool DoublyLinkedList::removeAt(int index)
 {
     if (!indexInBounds(index))
         return false;
@@ -201,13 +201,13 @@ bool LinkedList::removeAt(int index)
     });
 }
 
-void LinkedList::removeAll()
+void DoublyLinkedList::removeAll()
 {
     // keep deleting until head is null as well
     // i.e memory at head is free as well
     while (head != nullptr)
     {
-        Node *next = head->next;
+        DoubleSidedNode *next = head->next;
         delete head;
         head = next;
     }
@@ -220,11 +220,11 @@ void LinkedList::removeAll()
 /// @brief Runs between index 0 to `count()` - 1
 ///
 /// MUTABLE
-/// @param func `(NodeLink current, size_t currentIndex) -> void`
-void LinkedList::forEach(std::function<bool(NodeLink, size_t)> func)
+/// @param func `(DoubleSidedNodeLink current, size_t currentIndex) -> void`
+void DoublyLinkedList::forEach(std::function<bool(DoubleSidedNodeLink, size_t)> func)
 {
     size_t index = 0;
-    Node **current = &head;
+    DoubleSidedNode **current = &head;
     while (*current != nullptr)
     {
         // pass reference to the node itself
@@ -240,11 +240,11 @@ void LinkedList::forEach(std::function<bool(NodeLink, size_t)> func)
 /// @brief Runs between index 0 to `count()` - 1
 ///
 /// IMMUTABLE
-/// @param func `(ConstNode current, size_t currentIndex) -> void`
-void LinkedList::forEach(std::function<bool(ConstNode, size_t)> func) const
+/// @param func `(DoubleSidedConstNode current, size_t currentIndex) -> void`
+void DoublyLinkedList::forEach(std::function<bool(DoubleSidedConstNode, size_t)> func) const
 {
     size_t index = 0;
-    Node *current = head;
+    DoubleSidedNode *current = head;
     while (current != nullptr)
     {
         // pass const "copy" of the node
