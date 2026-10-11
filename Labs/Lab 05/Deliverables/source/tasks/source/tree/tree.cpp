@@ -162,21 +162,20 @@ void Tree::traversePreOrderDepthFirst(std::function<void(const TreeNode &node, i
     if (!hasRoot)
         return;
 
-    std::stack<const TreeNode *> nodes;
-    nodes.push(&rootNode);
-
-    while (!nodes.empty())
+    auto traverse = [&](auto &&self, const TreeNode *node) -> void
     {
-        // give the top node to consumer
-        const TreeNode *current = nodes.top();
-        forEach(*current, current->data);
-        nodes.pop(); // remove; since read
+        if (node == nullptr)
+            return; // base condition
 
-        // Push children in reverse order
-        // reverse since stack is LIFO
-        for (size_t i = current->children.size(); i > 0; i--)
-            nodes.push(current->children[i - 1]);
-    }
+        // visit parent before children
+        forEach(*node, node->data);
+
+        // recursively visit each child from left to right
+        for (const TreeNode *child : node->children)
+            self(self, child);
+    };
+
+    traverse(traverse, &rootNode);
 }
 
 void Tree::traversePostOrderDepthFirst(std::function<void(const TreeNode &node, int value)> forEach)
@@ -184,33 +183,20 @@ void Tree::traversePostOrderDepthFirst(std::function<void(const TreeNode &node, 
     if (!hasRoot)
         return;
 
-    std::stack<const TreeNode *> nodes;
-    std::stack<const TreeNode *> reversed;
-
-    nodes.push(&rootNode);
-
-    // fill the reversed stack
-    // first stack processes parents before children, from right to left
-    while (!nodes.empty())
+    auto traverse = [&](auto &&self, const TreeNode *node) -> void
     {
-        // store for traversal later
-        // since stack is LIFO, rightmost child is stored first
-        const TreeNode *current = nodes.top();
-        reversed.push(current);
-        nodes.pop(); // remove; since read
+        if (node == nullptr)
+            return; // base condition
 
-        // Push children from left to right
-        for (const TreeNode *child : current->children)
-            nodes.push(child);
-    }
+        // recursively visit each child from left to right
+        for (const TreeNode *child : node->children)
+            self(self, child);
 
-    while (!reversed.empty())
-    {
-        // give the top node to consumer
-        const TreeNode *current = reversed.top();
-        forEach(*current, current->data);
-        reversed.pop(); // remove; since read
-    }
+        // visit parent after all children
+        forEach(*node, node->data);
+    };
+
+    traverse(traverse, &rootNode);
 }
 
 // MARK: Deletion
