@@ -159,10 +159,21 @@ def publish_commit(commit):
         subprocess.run(["gh", "release", "edit", tag, "--title", title, "--notes-file", str(notes)], check=True)
     else:
         subprocess.run([
-            "gh", "release", "create", tag, "--verify-tag",
+            "gh", "release", "create", tag, "--verify-tag", "--draft",
             "--title", title, "--notes-file", str(notes), "--latest=false",
         ], check=True)
     subprocess.run(["gh", "release", "upload", tag, str(archive), "--clobber"], check=True)
+    # Explicitly publish after upload, including drafts left by earlier runs.
+    subprocess.run([
+        "gh", "release", "edit", tag, "--draft=false", "--prerelease=false",
+        "--latest=false", "--verify-tag",
+    ], check=True)
+    state = json.loads(subprocess.check_output([
+        "gh", "release", "view", tag, "--json", "isDraft,isPrerelease,url",
+    ], text=True))
+    if state["isDraft"] or state["isPrerelease"]:
+        raise ValueError(f"Release {tag} was not published as a regular release.")
+    print(f"Published release: {state['url']}")
 
 
 def publish():

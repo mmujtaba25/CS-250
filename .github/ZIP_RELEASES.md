@@ -31,6 +31,12 @@ older request is skipped if the tag already points to one of its descendants.
 For unrelated branch histories, the last processed request wins. Releases are
 not marked as the repository's latest release.
 
+New releases are prepared as drafts while the ZIP uploads, then explicitly
+published as regular releases. Existing drafts are also published after upload.
+The workflow verifies the final draft and prerelease flags; it fails if either
+is still set. If an upload fails, rerunning the updated workflow completes it
+and publishes the draft.
+
 The tag annotation contains the release notes and uses the commit's timestamp.
 Tag updates use a force-with-lease check so an unexpected concurrent change
 fails the push. Release creation requires the remote tag to exist. Existing
