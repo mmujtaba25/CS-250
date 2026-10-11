@@ -19,20 +19,27 @@ do not publish releases. A newly created branch scans its reachable history.
 | Field | Lab 5 | Assignments 2 |
 | --- | --- | --- |
 | Repository directory | `Labs/Lab 05` | `Assignments/Assignment 2` |
-| Release title | `Lab 05 (<SHA12>)` | `Assignment 02 (<SHA12>)` |
-| Tag | `lab-05-<SHA40>` | `assignment-02-<SHA40>` |
-| ZIP filename | `lab-05-<SHA40>.zip` | `assignment-02-<SHA40>.zip` |
+| Release title | `Lab 05` | `Assignment 02` |
+| Tag | `lab-05` | `assignment-02` |
+| ZIP filename | `lab-05.zip` | `assignment-02.zip` |
 
-The full commit SHA makes each release unique and its name predictable. Repeated
-runs update the same release and replace the same asset. Releases are not marked
-as the repository's latest release because branch execution order can vary.
+Each lab or assignment has one stable release URL and ZIP filename. Later ZIP
+requests update that release, replace its ZIP, and move its annotated tag to the
+requested commit. The full commit SHA remains in the release notes for traceability.
+Requests in a push are processed in order; publishing jobs are serialized. An
+older request is skipped if the tag already points to one of its descendants.
+For unrelated branch histories, the last processed request wins. Releases are
+not marked as the repository's latest release.
 
-Before publishing a release, the workflow creates and pushes an annotated Git
-tag at the exact ZIP request commit. Its annotation contains the release notes,
-and its tagger timestamp matches that commit's timestamp. Release creation
-requires the remote tag to exist. Retries verify existing tags and fail if a tag
-points to a different commit; tags are never moved or force-pushed. Lightweight
-tags created by the earlier workflow remain valid and are reused.
+The tag annotation contains the release notes and uses the commit's timestamp.
+Tag updates use a force-with-lease check so an unexpected concurrent change
+fails the push. Release creation requires the remote tag to exist. Existing
+lightweight tags are reused when they already point to the requested commit.
+
+Lab 05 links:
+
+- Release: https://github.com/mmujtaba25/CS-250/releases/tag/lab-05
+- ZIP: https://github.com/mmujtaba25/CS-250/releases/download/lab-05/lab-05.zip
 
 ZIPs contain tracked files from the requested commit, preserving the repository
 directory structure. Git archive export attributes apply. Files added in later
@@ -44,5 +51,4 @@ commits affecting that directory since the nearest prior matching ZIP directive
 in its ancestry. The first release includes the directory's full commit history.
 The baseline is the previous request, even if its publishing run has not finished.
 
-The workflow supports at most 256 matching commits per push, GitHub's matrix limit.
 It replaces the previous manual directory/tag inputs with commit-derived names.

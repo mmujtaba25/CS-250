@@ -1,7 +1,7 @@
 """Release snapshots requested by one full line: [ZIP] Lab|Assignments N.
 
-Tags and ZIP basenames: <lab|assignment>-<NN>-<full commit SHA>.
-Titles: <Lab|Assignment> NN (<SHA12>). Leading zeros in N are accepted.
+Tags and ZIP basenames: <lab|assignment>-<NN>.
+Titles: <Lab|Assignment> NN. Leading zeros in N are accepted.
 """
 
 import json
@@ -52,8 +52,6 @@ def discover():
         else:
             revision = after
         commits = [commit for commit in git("rev-list", "--reverse", revision).splitlines() if request(commit)]
-    if len(commits) > 256:
-        raise ValueError("A push may contain at most 256 ZIP requests (matrix limit).")
     with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
         output.write(f"matrix={json.dumps(commits, separators=(',', ':'))}\n")
     print(f"Found {len(commits)} ZIP request(s).")
@@ -67,7 +65,7 @@ def package(commit, output):
     directory, label, slug = target
     if git("cat-file", "-t", f"{commit}:{directory}") != "tree":
         raise ValueError(f"{commit}: {directory} must be a directory.")
-    tag, title = f"{slug}-{commit}", f"{label} ({commit[:12]})"
+    tag, title = slug, label
     output.mkdir(parents=True, exist_ok=True)
     archive = output / f"{tag}.zip"
     # Archiving the commit with a pathspec preserves its fixed timestamps.
@@ -109,50 +107,53 @@ def package(commit, output):
 
 
 def ensure_tag(commit, tag, notes):
-    """Create an annotated remote tag, or verify an existing tag's commit."""
+    """Update the stable annotated tag, without letting an old retry roll it back."""
     ref = f"refs/tags/{tag}"
     remote = subprocess.run(
         ["git", "ls-remote", "--exit-code", "origin", ref, f"{ref}^{{}}"],
         text=True, capture_output=True,
     )
+    expected = ""
     if remote.returncode == 0:
         refs = dict(line.split("\t", 1)[::-1] for line in remote.stdout.splitlines())
         # Annotated tags resolve through their peeled ref; lightweight tags
         # from earlier workflow versions point directly to the commit.
         target = refs.get(f"{ref}^{{}}", refs.get(ref))
-        if target != commit:
-            raise ValueError(f"Tag {tag} points to {target}, expected {commit}; refusing to move it.")
-        print(f"Verified existing tag {tag} at {commit}.")
-        return
-    if remote.returncode != 2:  # ls-remote returns 2 when no ref matches.
+        expected = refs[ref]
+        if target == commit:
+            print(f"Verified existing tag {tag} at {commit}.")
+            return True
+        subprocess.run(["git", "fetch", "origin", ref], check=True)
+        ancestry = subprocess.run(["git", "merge-base", "--is-ancestor", commit, target])
+        if ancestry.returncode == 0:
+            print(f"Skipping older request {commit}; {tag} already points to {target}.")
+            return False
+        if ancestry.returncode != 1:
+            raise subprocess.CalledProcessError(ancestry.returncode, ancestry.args)
+    elif remote.returncode != 2:  # ls-remote returns 2 when no ref matches.
         raise subprocess.CalledProcessError(
             remote.returncode, remote.args, output=remote.stdout, stderr=remote.stderr
         )
 
-    local = subprocess.run(
-        ["git", "show-ref", "--verify", "--quiet", ref],
-    )
-    if local.returncode == 0:
-        if git("rev-parse", f"{ref}^{{commit}}") != commit:
-            raise ValueError(f"Local tag {tag} points to another commit; refusing to move it.")
-    elif local.returncode == 1:
-        environment = os.environ.copy()
-        environment["GIT_COMMITTER_DATE"] = git("show", "-s", "--format=%cI", commit)
-        subprocess.run([
-            "git", "-c", "user.name=github-actions[bot]",
-            "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com",
-            "tag", "--annotate", tag, commit, "--cleanup=verbatim", "--file", str(notes),
-        ], check=True, env=environment)
-    else:
-        raise subprocess.CalledProcessError(local.returncode, local.args)
-    subprocess.run(["git", "push", "origin", f"{ref}:{ref}"], check=True)
+    environment = os.environ.copy()
+    environment["GIT_COMMITTER_DATE"] = git("show", "-s", "--format=%cI", commit)
+    subprocess.run([
+        "git", "-c", "user.name=github-actions[bot]",
+        "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com",
+        "tag", "--force", "--annotate", tag, commit, "--cleanup=verbatim", "--file", str(notes),
+    ], check=True, env=environment)
+    subprocess.run([
+        "git", "push", f"--force-with-lease={ref}:{expected}", "origin", f"{ref}:{ref}",
+    ], check=True)
     print(f"Published tag {tag} at {commit}.")
+    return True
 
 
-def publish():
-    commit, tag, title, archive, notes = package(os.environ["RELEASE_COMMIT"], Path("release-assets"))
-    ensure_tag(commit, tag, notes)
-    # Per-commit concurrency serializes retries; recover partial asset uploads.
+def publish_commit(commit):
+    commit, tag, title, archive, notes = package(commit, Path("release-assets"))
+    if not ensure_tag(commit, tag, notes):
+        return
+    # Publishing is serialized so tag, release notes, and archive stay aligned.
     existing = subprocess.run(["gh", "release", "view", tag], stdout=subprocess.DEVNULL).returncode == 0
     if existing:
         subprocess.run(["gh", "release", "edit", tag, "--title", title, "--notes-file", str(notes)], check=True)
@@ -162,6 +163,11 @@ def publish():
             "--title", title, "--notes-file", str(notes), "--latest=false",
         ], check=True)
     subprocess.run(["gh", "release", "upload", tag, str(archive), "--clobber"], check=True)
+
+
+def publish():
+    for commit in json.loads(os.environ["RELEASE_COMMITS"]):
+        publish_commit(commit)
 
 
 if __name__ == "__main__":

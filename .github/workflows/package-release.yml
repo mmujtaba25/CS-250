@@ -30,12 +30,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        commit: ${{ fromJSON(needs.discover.outputs.matrix) }}
     concurrency:
-      group: zip-release-${{ matrix.commit }}
+      group: zip-releases
       cancel-in-progress: false
     steps:
       - name: Check out complete commit history
@@ -45,6 +41,6 @@ jobs:
 
       - name: Package the requested commit, push its tag, and publish its release
         env:
-          RELEASE_COMMIT: ${{ matrix.commit }}
+          RELEASE_COMMITS: ${{ needs.discover.outputs.matrix }}
           GH_TOKEN: ${{ github.token }}
         run: python3 .github/scripts/package_release.py publish
