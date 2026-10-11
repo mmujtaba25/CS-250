@@ -1,54 +1,50 @@
-name: Package directory release
+name: Package ZIP releases
 
 on:
-  workflow_dispatch:
-    inputs:
-      directory:
-        description: Repository directory to package (for example, Labs/Lab 03)
-        required: true
-        type: string
-      tag:
-        description: Release tag (for example, lab-03)
-        required: true
-        type: string
+  push:
+    branches:
+      - '**'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  package-and-release:
+  discover:
+    if: ${{ !github.event.deleted }}
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.commits.outputs.matrix }}
     steps:
-      - name: Check out repository
+      - name: Check out complete commit history
         uses: actions/checkout@v4
-
-      - name: Package directory
-        id: package
-        env:
-          INPUT_DIRECTORY: ${{ inputs.directory }}
-          INPUT_TAG: ${{ inputs.tag }}
-        run: |
-          set -euo pipefail
-
-          if [[ "$INPUT_DIRECTORY" = /* || "/$INPUT_DIRECTORY/" == *"/../"* || ! -d "$INPUT_DIRECTORY" ]]; then
-            echo "Directory must be an existing path inside the repository." >&2
-            exit 1
-          fi
-          if [[ -z "$INPUT_TAG" || "$INPUT_TAG" == *[!a-zA-Z0-9._-]* ]]; then
-            echo "Tag may contain only letters, numbers, dots, underscores, and hyphens." >&2
-            exit 1
-          fi
-
-          directory_name="$(basename "$INPUT_DIRECTORY")"
-          archive="${directory_name}-${INPUT_TAG}.zip"
-          parent_directory="$(dirname "$INPUT_DIRECTORY")"
-          (cd "$parent_directory" && zip -r "$GITHUB_WORKSPACE/$archive" "$directory_name")
-          echo "archive=$archive" >> "$GITHUB_OUTPUT"
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
-          name: ${{ inputs.tag }}
-          files: ${{ steps.package.outputs.archive }}
-          generate_release_notes: true
+          fetch-depth: 0
+
+      - name: Find every ZIP commit in the push
+        id: commits
+        run: python3 .github/scripts/package_release.py discover
+
+  package-and-release:
+    needs: discover
+    if: ${{ needs.discover.outputs.matrix != '[]' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    concurrency:
+      group: zip-release-${{ matrix.commit }}
+      cancel-in-progress: false
+    steps:
+      - name: Check out complete commit history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package the requested commit, push its tag, and publish its release
+        env:
+          RELEASE_COMMIT: ${{ matrix.commit }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/package_release.py publish
