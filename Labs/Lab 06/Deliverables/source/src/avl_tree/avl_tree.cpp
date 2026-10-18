@@ -20,7 +20,7 @@ AVLTreeNode *AVLTree::createTree(int data)
         .parent = nullptr,
         .left = nullptr,
         .right = nullptr,
-        .height = 0 //
+        .height = 1 //
     };
 
     nodeCount = 1;
@@ -58,7 +58,7 @@ AVLTreeNode *AVLTree::insert(int data)
         .parent = parent,
         .left = nullptr,
         .right = nullptr,
-        .height = 0 //
+        .height = 1 //
     };
 
     // insert left if less than found parent
