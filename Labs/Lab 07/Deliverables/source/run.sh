@@ -17,6 +17,7 @@ readonly GREEN RED YELLOW CYAN PURPLE RESET
 build_type="Debug"
 if [[ "$1" == "--release" ]]; then
     build_type="Release"
+    shift # remove '--release' from the argument list
 fi
 # * parsing arguments end
 
@@ -36,9 +37,9 @@ cmake --build --preset default-build --config $build_type
 start=$(date +%s.%N)
 echo -e "${PURPLE}Executable Started ... ${RESET}"
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    build/main
+    build/main "$@"
 elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* || "$OSTYPE" == "win"* ]]; then
-    build/$build_type/main.exe
+    build/$build_type/main.exe "$@"
 else
     echo -e "${RED}Unsupported OS type: $OSTYPE${RESET}"
     exit 1
