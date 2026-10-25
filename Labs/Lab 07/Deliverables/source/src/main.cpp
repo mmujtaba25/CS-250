@@ -1,108 +1,216 @@
 #include <print>
+#include <fstream>
+#include <sstream>
 #include <optional>
+#include <expected>
+#include <cctype>
+#include <charconv>
 
 #include "stack.hpp"
 
-void highlightStackElement(const std::string &expression, const std::vector<size_t> &indexes);
-std::optional<char> equivalantBracket(char current);
+std::vector<std::string> readCSV(std::string filename);
+std::vector<std::string> infixToPostfix(const std::vector<std::string> &tokens);
+double evaluatePostfix(const std::vector<std::string> &tokens);
+
+// UTILS
+bool isOperator(const std::string &token);
+std::expected<double, std::errc> isNumber(const std::string &token);
+int precedence(const std::string &op);
 
 int main(int argc, char *argv[])
 {
     if (argc < 2)
     {
-        std::println("Pass in the expression as the first argument when running");
+        std::println("Pass in the filename as the first argument when running");
         return -1;
     }
 
-    std::string expression = argv[1];
-    Stack<std::pair<size_t, char>> brackets_pair;
+    std::string infixFile = argv[1];
 
-    auto handleClosingBracket = [&brackets_pair, &expression](size_t index, char openingBracket) -> void { //
-        if (!brackets_pair.isEmpty() && brackets_pair.peek()->second == openingBracket)
-            brackets_pair.pop();
-        else
-        {
-            std::println("Mismatch at idx:{}; Expected {} or new scope.", index, equivalantBracket(brackets_pair.peek()->second).value());
-            highlightStackElement(expression, {index});
-        }
-    };
+    std::vector<std::string> infix = readCSV(infixFile);
 
-    for (size_t i = 0; i < expression.size(); i++)
+    std::print("Expression : ");
+    for (const std::string &token : infix)
     {
-        const char &c = expression[i];
-
-        switch (c)
-        {
-        case '(':
-        case '{':
-        case '[':
-            brackets_pair.push(std::make_pair(i, c));
-            break;
-
-        case ')':
-        case '}':
-        case ']':
-            handleClosingBracket(i, equivalantBracket(c).value_or(' '));
-            break;
-
-        // skip any other character
-        default:
-            continue;
-        }
+        std::print("{} ", token);
     }
+    std::println();
 
-    if (brackets_pair.isEmpty())
-        std::println("Valid expression");
-    else
+    std::vector<std::string> tokens = infixToPostfix(infix);
+
+    std::print("Converted  : ");
+    for (const std::string &token : tokens)
     {
-        std::println("\nInvalid expression:");
-        std::vector<size_t> indexes;
-
-        for (const auto &[index, bracket] : brackets_pair)
-            indexes.push_back(index);
-
-        highlightStackElement(expression, indexes);
-
-        for (int i = indexes.size(); i > 0; i--)
-        {
-            size_t index = indexes[i - 1];
-            std::println("idx:{}; No valid closing equivalant found for {}", index, expression[index]);
-        }
+        std::print("{} ", token);
     }
+    std::print("= {}\n", evaluatePostfix(tokens));
 
     return 0;
 }
 
-void highlightStackElement(const std::string &expression, const std::vector<size_t> &indexes)
+std::vector<std::string> readCSV(std::string filename)
 {
-    std::println("{}", expression);
+    std::fstream infixFile(filename);
+    std::vector<std::string> tokens(0);
 
-    std::string markers(expression.size(), ' ');
+    if (!infixFile.is_open())
+    {
+        std::println("Error opening CSV file");
+        return {};
+    }
 
-    for (size_t index : indexes)
-        if (index < markers.size())
-            markers[index] = '^';
+    std::string line;
+    while (std::getline(infixFile, line))
+    {
+        // convert string to a stream
+        std::stringstream ss(line);
 
-    std::println("{}", markers);
+        // split by ,
+        std::string field;
+        while (std::getline(ss, field, ','))
+            tokens.push_back(field);
+    }
+
+    infixFile.close();
+
+    return tokens;
 }
 
-std::optional<char> equivalantBracket(char current)
+std::vector<std::string> infixToPostfix(const std::vector<std::string> &tokens)
 {
-    switch (current)
+    Stack<std::string> stack;
+    std::vector<std::string> postfix;
+
+    for (const std::string &token : tokens)
     {
-    case '(':
-        return ')';
-    case ')':
-        return '(';
-    case '{':
-        return '}';
-    case '}':
-        return '{';
-    case '[':
-        return ']';
-    case ']':
-        return '[';
+        if (isNumber(token))
+            postfix.push_back(token);
+        else if (token.size() == 1 && token[0] == '(')
+            stack.push(token);
+        else if (token.size() == 1 && token[0] == ')')
+        {
+            // while stack not empty && not (stack top is "(")
+            while (!stack.isEmpty() && !(stack.peek()->size() == 1 && (*stack.peek())[0] == '('))
+            {
+                postfix.push_back(stack.pop().value());
+            }
+            stack.pop();
+        }
+        else if (isOperator(token))
+        {
+            // while stack not empty && not (stack top is "(") && precendence of next is greater then of current
+            while (!stack.isEmpty()                                             //
+                   && !(stack.peek()->size() == 1 && (*stack.peek())[0] == '(') //
+                   && (precedence(*stack.peek()) >= precedence(token)))
+            {
+                postfix.push_back(stack.pop().value());
+            }
+            stack.push(token);
+        }
+    }
+
+    while (!stack.isEmpty())
+        postfix.push_back(stack.pop().value());
+
+    return postfix;
+}
+
+double evaluatePostfix(const std::vector<std::string> &tokens)
+{
+    Stack<double> numbers;
+
+    for (const std::string &token : tokens)
+    {
+        if (auto num = isNumber(token))
+            numbers.push(*num);
+        else if (isOperator(token))
+        {
+            // pop right operand first
+            double b = numbers.pop().value();
+            double a = numbers.pop().value();
+            double result;
+
+            switch (token[0])
+            {
+            case '+':
+                result = a + b;
+                break;
+
+            case '-':
+                result = a - b;
+                break;
+
+            case '*':
+                result = a * b;
+                break;
+
+            case '/':
+                result = a / b;
+                break;
+            }
+
+            numbers.push(result);
+        }
+    }
+
+    return numbers.pop().value();
+}
+
+// MARK: UTILS
+
+bool isOperator(const std::string &token)
+{
+    if (token.size() != 1)
+        return false;
+
+    switch (token[0])
+    {
+    case '+':
+    case '-':
+    case '*':
+    case '/':
+        return true;
+
     default:
-        return std::nullopt;
+        return false;
+    }
+}
+
+std::expected<double, std::errc> isNumber(const std::string &token)
+{
+    if (token.empty())
+        return std::unexpected(std::errc::invalid_argument);
+
+    double value;
+    // attempt to parse as double
+    auto [ptr, ec] = std::from_chars(token.data(), token.data() + token.size(), value);
+
+    // propogate error
+    if (ec != std::errc{})
+        return std::unexpected(ec);
+
+    // check if fully parsed; fail "123a"
+    if (ptr != token.data() + token.size())
+        return std::unexpected(std::errc::invalid_argument);
+
+    return value;
+}
+
+int precedence(const std::string &op)
+{
+    if (!isOperator(op))
+        return 0;
+
+    switch (op[0])
+    {
+    case '+':
+    case '-':
+        return 1;
+    case '*':
+    case '/':
+        return 2;
+
+    default:
+        return 0;
     }
 }
