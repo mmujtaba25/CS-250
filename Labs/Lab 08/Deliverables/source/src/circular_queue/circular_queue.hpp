@@ -4,9 +4,9 @@
 #include <optional>
 #include <functional>
 
+template <typename T>
 class CircularQueue
 {
-    using T = int;
     using ConstT = const T &;
 
 private:

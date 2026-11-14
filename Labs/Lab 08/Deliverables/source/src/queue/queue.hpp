@@ -3,10 +3,10 @@
 #include <optional>
 #include <functional>
 
+template <typename T>
 class Queue
 {
 private: // MARK: Internal
-    using T = int;
     using ConstT = const T &;
 
     struct InternalNode
