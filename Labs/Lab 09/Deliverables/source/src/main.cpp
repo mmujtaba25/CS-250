@@ -1,40 +1,25 @@
+#include <cstdint>
 #include <print>
 #include "hash_table.hpp"
 
-template <typename T, size_t S>
-void search(ArrayHashTable<T, S> &table, const T &target);
-
 int main()
 {
-    ArrayHashTable<uint16_t, 10> table;
+    LinkedListHashTable<uint16_t, 7> table;
 
-    std::vector<uint16_t> keys = {23, 43, 13, 27, 33, 37};
-    for (uint16_t key : keys)
-    {
+    for (uint16_t key : {14, 33, 8, 15, 9, 19, 11, 27, 12})
         table.insert(key);
-    }
 
-    std::println("Hash Table:");
-    table.forEach([](size_t index, const std::optional<uint16_t> &value) { //
+    table.forEach([](size_t index, const SlotNode<uint16_t> &slot) { //
         std::print("[{}] -> ", index);
-        if (value.has_value())
-            std::println("{}", value.value());
-        else
+        if (!slot.exists())
+        {
             std::println("-");
+            return;
+        }
+
+        for (const auto *curr = slot.getHead(); curr != nullptr; curr = curr->next)
+            std::print("{}{}", curr->value, curr->next ? " -> " : "\n");
     });
 
-    search(table, (uint16_t)27);
-    search(table, (uint16_t)99);
-
     return 0;
-}
-
-template <typename T, size_t S>
-void search(ArrayHashTable<T, S> &table, const T &target)
-{
-    std::optional<size_t> result = table.search(target);
-    if (result.has_value())
-        std::println("Key {} found at index {}", target, result.value());
-    else
-        std::println("Key {} found not found", target);
 }
