@@ -79,8 +79,7 @@ private:
     bool remove(const T &val) { return list.remove(val); }
     bool contains(const T &val) const { return list.contains(val); }
 
-    template <UnsignedNumeric U, size_t S>
-        requires(S > 0)
+    template <UnsignedNumeric U>
     friend class LinkedListHashTable;
 
 public:
@@ -88,25 +87,41 @@ public:
     const typename LinkedList<T>::Node *getHead() const { return list.getHead(); }
 };
 
-template <UnsignedNumeric T, size_t S = 7>
-    requires(S > 0)
+template <UnsignedNumeric T>
 class LinkedListHashTable
 {
 private:
     SlotNode<T> *buckets;
+    size_t tableSize;
+    size_t elementCount = 0;
 
-    size_t hash(const T &element) const { return element % S; }
+    size_t hash(const T &element) const { return element % tableSize; }
 
 public:
-    LinkedListHashTable() { buckets = new SlotNode<T>[S]; }
+    explicit LinkedListHashTable(size_t initialSize = 24) : tableSize(initialSize > 0 ? initialSize : 24)
+    {
+        buckets = new SlotNode<T>[tableSize];
+    }
+
     ~LinkedListHashTable() { delete[] buckets; }
 
-    // no copying
-    LinkedListHashTable(const LinkedListHashTable &other) = delete;
-    LinkedListHashTable &operator=(const LinkedListHashTable &other) = delete;
+    LinkedListHashTable(const LinkedListHashTable &) = delete;
+    LinkedListHashTable &operator=(const LinkedListHashTable &) = delete;
 
-    void insert(const T &newValue) { buckets[hash(newValue)].insert(newValue); }
-    bool remove(const T &element) { return buckets[hash(element)].remove(element); }
+    void insert(const T &newValue)
+    {
+        buckets[hash(newValue)].insert(newValue);
+        elementCount++;
+    }
+
+    bool remove(const T &element)
+    {
+        if (!buckets[hash(element)].remove(element))
+            return false;
+
+        elementCount--;
+        return true;
+    }
 
     std::optional<size_t> search(const T &element) const
     {
@@ -117,10 +132,31 @@ public:
         return std::nullopt;
     }
 
-    // Immutable forEach passing bucket index and head SlotNode reference
+    void resize(size_t newSize)
+    {
+        if (newSize == 0 || newSize == tableSize)
+            return;
+
+        SlotNode<T> *newBuckets = new SlotNode<T>[newSize];
+
+        for (size_t i = 0; i < tableSize; i++)
+        {
+            for (const auto *curr = buckets[i].getHead(); curr != nullptr; curr = curr->next)
+                newBuckets[curr->value % newSize].insert(curr->value);
+        }
+
+        delete[] buckets; // Automatically frees old chain nodes via ~LinkedList()
+        buckets = newBuckets;
+        tableSize = newSize;
+    }
+
+    size_t size() const { return elementCount; }
+    size_t capacity() const { return tableSize; }
+    double loadFactor() const { return static_cast<double>(elementCount) / tableSize; }
+
     void forEach(std::function<void(size_t, const SlotNode<T> &)> callable) const
     {
-        for (size_t i = 0; i < S; i++)
+        for (size_t i = 0; i < tableSize; i++)
             callable(i, buckets[i]);
     }
 };
